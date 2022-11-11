@@ -30,15 +30,15 @@ resolve.obj <-resolve.objs[[SAMPLE_NAME]]
 
 #### Quick test single cell analysis, not meaningful just to have something to plot
 resolve.obj <- subset(resolve.obj, subset = nCount_Spatial > 10) # Skip cells with no transcripts 
-resolve.obj <- SCTransform(resolve.obj, assay = "Spatial", verbose = FALSE)
-resolve.obj <- FindVariableFeatures(resolve.obj, assay = "Spatial")
+resolve.obj <- SCTransform(resolve.obj, assay = "Resolve", verbose = FALSE)
+resolve.obj <- FindVariableFeatures(resolve.obj, assay = "Resolve")
 resolve.obj <- RunPCA(object = resolve.obj, npcs = 20, verbose = FALSE)
 resolve.obj <- RunUMAP(object = resolve.obj, dims = 1:20, verbose = FALSE)
 resolve.obj <- FindNeighbors(object = resolve.obj, dims = 1:20, verbose = FALSE)
 resolve.obj <- FindClusters(object = resolve.obj, verbose = FALSE,
   resolution = 0.1)
 
-resolve.obj@active.assay <- "Spatial" # To show the real counts in the plots
+resolve.obj@active.assay <- "Resolve" # To show the real counts in the plots
 
 
 
@@ -52,22 +52,22 @@ nos_dp <- DimPlot(resolve.obj, label = TRUE, label.box = TRUE) + NoLegend()
 nos_fp <- FeaturePlot(resolve.obj, features = FEATURES_TO_PLOT, min.cutoff = "q10", max.cutoff = "q90") 
 
 # Plus spatial data (cells as circles on their centroids)
-cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "cen")
-cen_fp <- ImageFeaturePlot(resolve.obj, fov = "cen", features = FEATURES_TO_PLOT)
+cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "centroids")
+cen_fp <- ImageFeaturePlot(resolve.obj, fov = "centroids", features = FEATURES_TO_PLOT)
 
 # Plus spatial data (cells as segmentation outlines)
-seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "seg")
+seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "segmentation")
 seg_fp <- ImageFeaturePlot(resolve.obj, features = FEATURES_TO_PLOT,
-    min.cutoff = "q10", max.cutoff = "q90", fov = "seg")
+    min.cutoff = "q10", max.cutoff = "q90", fov = "segmentation")
 
 # Raw transcript visualization
 # - size = 0 avoids displaying the cells
 # - nmols = 9999999999 displays all the transcripts, instead of a sample 
-cen_mp <- ImageFeaturePlot(resolve.obj, fov = "cen", features = FEATURES_TO_PLOT[1], size = 0,
-  molecules = FEATURES_TO_PLOT, mols.cols = c("#FF0000",
- "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
+cen_mp <- ImageFeaturePlot(resolve.obj, fov = "centroids", features = FEATURES_TO_PLOT[1],
+  size = 0, molecules = FEATURES_TO_PLOT, mols.cols = c("#FF0000",
+  "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
 
-seg_mp <- ImageFeaturePlot(resolve.obj, fov = "seg", features = FEATURES_TO_PLOT[1], 
+seg_mp <- ImageFeaturePlot(resolve.obj, fov = "segmentation", features = FEATURES_TO_PLOT[1], 
   molecules = FEATURES_TO_PLOT, mols.cols = c("#0000FF"), nmols = 9999999999,
   min.cutoff = "q10", max.cutoff = "q90")
 
@@ -121,10 +121,10 @@ assignInNamespace("GetTissueCoordinates.Segmentation",
 resolve.obj <- ScaleData(resolve.obj) # 
 
 sfs_method <- "markvariogram" # moransi also runs 
-resolve.obj <- FindSpatiallyVariableFeatures(resolve.obj, assay = "Spatial", image = "seg",
+resolve.obj <- FindSpatiallyVariableFeatures(resolve.obj, assay = "Resolve", image = "seg",
   selection.method = sfs_method)
 top_features <- SpatiallyVariableFeatures(resolve.obj, decreasing = T,
   selection.method = sfs_method)
 
-top_fp <- ImageFeaturePlot(resolve.obj, fov = "cen", features = "Vip", size = 0,
+top_fp <- ImageFeaturePlot(resolve.obj, fov = "centroids", features = "Vip", size = 0,
   molecules = top_features[1:3], nmols = nrow(transcripts)) 

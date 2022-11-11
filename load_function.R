@@ -24,7 +24,7 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     row.names(measurements) <- markers
     colnames(measurements) <- cells$cell_id
     
-    resolve.obj <- CreateSeuratObject(counts = measurements, assay = "Spatial")
+    resolve.obj <- CreateSeuratObject(counts = measurements, assay = "Resolve")
 
     resolve.obj@meta.data["cell_id"] <- rownames(resolve.obj@meta.data)
     resolve.obj@meta.data["sample_name"] <- cells$sample.name
@@ -48,14 +48,14 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     }
     
     resolve.obj@images <- list()
-    resolve.obj@images["cen"] <- CreateFOV(
+    resolve.obj@images["centroids"] <- CreateFOV(
         coords = fov_coordinates,
         type = "centroids",
         nsides = 0L,
         radius = 1L,
         theta = 0L,
         molecules = transcripts, # Only for visualising the raw transcripts, can be skipped
-        assay = "Spatial",
+        assay = "Resolve",
         key = NULL,
         name = NULL)
 
@@ -72,14 +72,14 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
         cell_roi[, x := width - x]
         cell_roi <- as.data.frame(cell_roi)
         
-        resolve.obj@images["seg"] <- CreateFOV(
+        resolve.obj@images["segmentation"] <- CreateFOV(
         coords = cell_roi,
         type = "segmentation",
         nsides = 0L,
         radius = 1L,
         theta = 0L,
         molecules = transcripts, # Only for visualising the raw transcripts, can be skipped
-        assay = "Spatial",
+        assay = "Resolve",
         key = NULL,
         name = NULL)
     }
