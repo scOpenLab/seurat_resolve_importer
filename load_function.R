@@ -6,8 +6,8 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     width <- mask_metadata$width
     height <- mask_metadata$length
     cells <- fread(cells.file)
-    cells[, x := height - centroid.x] 
-    cells[, y := centroid.y] 
+    cells[, x := height - centroid.y]
+    cells[, y := centroid.x]
     cells[, cell_id := paste0(sample.name, "-cell-", label)]
     
     markers <- colnames(cells)[!(colnames(cells) %in% c("sample_name", "group",
@@ -24,7 +24,7 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     row.names(measurements) <- markers
     colnames(measurements) <- cells$cell_id
     
-    resolve.obj <- CreateSeuratObject(counts = measurements, assay = "Resolve")
+    resolve.obj <- CreateSeuratObject(counts = measurements, assay = "Spatial")
 
     resolve.obj@meta.data["cell_id"] <- rownames(resolve.obj@meta.data)
     resolve.obj@meta.data["sample_name"] <- cells$sample.name
@@ -40,7 +40,7 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     
     if (!is.null(transcript.file)){
         transcripts <- fread(transcript.file)
-        transcripts <- transcripts[, .(x = width - V1, y = V2, gene = V4)]
+        transcripts <- transcripts[, .(x = height - V2, y = V1, gene = V4)]
         transcripts <- as.data.frame(transcripts)
     }
     else{
@@ -48,14 +48,14 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     }
     
     resolve.obj@images <- list()
-    resolve.obj@images["centroids"] <- CreateFOV(
+    resolve.obj@images["cen"] <- CreateFOV(
         coords = fov_coordinates,
         type = "centroids",
         nsides = 0L,
         radius = 1L,
         theta = 0L,
         molecules = transcripts, # Only for visualising the raw transcripts, can be skipped
-        assay = "Resolve",
+        assay = "Spatial",
         key = NULL,
         name = NULL)
 
@@ -69,23 +69,25 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
         cell_roi <- lapply(cell_roi, as.data.table)
         cell_roi <- rbindlist(cell_roi, idcol = "cell_id")
         cell_roi[, cell_id := paste0(sample.name, "-cell-", as.integer(cell_id) + 1)]
-        cell_roi[, x := width - x]
+        cell_roi[, y2 := y]
+        cell_roi[, y := x]
+        cell_roi[, x := height - y2]
+        cell_roi[, y2 := NULL]
         cell_roi <- as.data.frame(cell_roi)
         
-        resolve.obj@images["segmentation"] <- CreateFOV(
+        resolve.obj@images["seg"] <- CreateFOV(
         coords = cell_roi,
         type = "segmentation",
         nsides = 0L,
         radius = 1L,
         theta = 0L,
         molecules = transcripts, # Only for visualising the raw transcripts, can be skipped
-        assay = "Resolve",
+        assay = "Spatial",
         key = NULL,
         name = NULL)
     }
     return(resolve.obj)
 }
-
 
 LoadResolveFromFolders <- function(cell.folder, panorama.folder = NULL){
     metadata <- dir(cell.folder, recursive = T, full.names = T, pattern = "EXP")
