@@ -48,7 +48,7 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
     }
     
     resolve.obj@images <- list()
-    resolve.obj@images["cen"] <- CreateFOV(
+    resolve.obj@images["centroids"] <- CreateFOV(
         coords = fov_coordinates,
         type = "centroids",
         nsides = 0L,
@@ -75,7 +75,7 @@ LoadResolve <- function(cells.file, mask.file, image.file = NULL, ROI.file = NUL
         cell_roi[, y2 := NULL]
         cell_roi <- as.data.frame(cell_roi)
         
-        resolve.obj@images["seg"] <- CreateFOV(
+        resolve.obj@images["segmentation"] <- CreateFOV(
         coords = cell_roi,
         type = "segmentation",
         nsides = 0L,
