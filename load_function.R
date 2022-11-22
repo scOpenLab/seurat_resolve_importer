@@ -1,5 +1,55 @@
+rm(list = ls())
+library(future)
+plan("multisession", workers = 10)
+library(data.table)
+library(Seurat)
+library(tiff)
+.libPaths("~/R/x86_64-pc-linux-gnu-library/4.2.1")
+library(RImageJROI)
+library(docstring)
+
+ConvertCoordinatesResolve <- function(resolve.data, x.res = 0.138, y.res = 0.138){
+    #' Convert the coordinates of Resolve data from pixel to micron.
+    #' 
+    #' @description Helper function for FormatResove. This function takes the list of Resolve
+    #' data and converts the coordinates to microsn.
+    #'   
+    #' @param resolve.data list Name of the sample (used for naming the cells, see @details).
+    #' @param x.res numeric Path to the segmentation mask. Optional, default = 0.138 um
+    #' @param y.res numeric Path to the single cell data. Optional, 
+    #' 
+    #' @usage Meant to be called by ReadResolve. It assumes the input files have been created with
+    #' ResolveTools pipeline: https://codebase.helmholtz.cloud/resolve_tools/resolve-processing
+    #'
+    #' @return A named list with the following objects:
+    #' \itemize{
+    #' \item expression: Expression matrix rows -> gene, columns -> cells. Optional.
+    #' \item coordinates: Dataframe with the coordinates of the cell centroids. Optional
+    #' \item transcripts: Dataframe with the coordinates of the transcripts. Optional
+    #' \item image: Additional image. Optional
+    #' \item rois: Dataframe with the coordinates of the segmentation ROIs. Optional.
+    #' }
+    #'
+    #' @details The cells are named with the "$SAMPLE-cell-$N" pattern,
+    #' with 1 < N < max(segmentation mask).
+    #'
+    resolve.data[["coordinates"]]$x <- resolve.data[["coordinates"]]$x * x.res
+    resolve.data[["coordinates"]]$y <- resolve.data[["coordinates"]]$y * y.res
+    if (!is.null(resolve.data[["rois"]])){
+        resolve.data[["rois"]]$x <- resolve.data[["rois"]]$x * x.res
+        resolve.data[["rois"]]$y <- resolve.data[["rois"]]$y * y.res
+    }
+    
+    if (!is.null(resolve.data[["transcripts"]])){
+        resolve.data[["transcripts"]]$x <- resolve.data[["transcripts"]]$x * x.res
+        resolve.data[["transcripts"]]$y <- resolve.data[["transcripts"]]$y * y.res
+    }
+    return(resolve.data)
+}
+
+
 FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = NULL,
-    image.file = NULL, roi.file = NULL){
+    image.file = NULL, roi.file = NULL, use.micron = TRUE){
     #' Format Resolve Data for Input
     #' 
     #' @description Helper function for ReadResolve, This function reads the provided file names
@@ -11,6 +61,7 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
     #' @param transcript.file character. Path to the transcript coordinates. Optional.
     #' @param image.file character. Path to an additional image to load. Optional.
     #' @param roi.file character. Path to the zip file with the segmentation ROIs. Optional.
+    #' @param use.micron boolean. Use coordinates in um instead of pixel. Optional.
     #' 
     #' @usage Meant to be called by ReadResolve. It assumes the input files have been created with
     #' ResolveTools pipeline: https://codebase.helmholtz.cloud/resolve_tools/resolve-processing
@@ -19,13 +70,14 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
     #' \itemize{
     #' \item expression: Expression matrix rows -> gene, columns -> cells.
     #' \item coordinates: Dataframe with the coordinates of the cell centroids.
-    #' \item transcripts: Dataframe with the coordinates of the transcripts.
-    #' \item image: Additional image
-    #' \item rois: Dataframe with the coordinates of the segmentation ROIs.
+    #' \item transcripts: Dataframe with the coordinates of the transcripts. Optional
+    #' \item image: Additional image. Optional
+    #' \item rois: Dataframe with the coordinates of the segmentation ROIs. Optional
     #' }
     #'
     #' @details The cells are named with the "$SAMPLE-cell-$N" pattern,
     #' with 1 < N < max(segmentation mask).
+    #' All coordinates are in micron unless use.micron it's set to FALSE. It assumes that the pixel are 138nm X 138nm
     #'
     outs <- list()
     
@@ -80,10 +132,13 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
         cell_roi <- as.data.frame(cell_roi)
         outs[["rois"]] <- cell_roi
     }
+    if (use.micron){
+        outs <- ConvertCoordinatesResolve(outs)
+    }
     return(outs)
 }    
 
-ReadResolve <- function(data.dir, sample.name = NULL){
+ReadResolve <- function(data.dir, sample.name = NULL, use.micron = TRUE){
     #' Read Resolve Data from a given folder and return them formatted for import with Seurat
     #' 
     #' @description This function reads the provided file names from a given folder
@@ -92,6 +147,7 @@ ReadResolve <- function(data.dir, sample.name = NULL){
     #' @param data.dir character. Path to the directory containing the data to be loaded.
     #' @param sample.name character. Name of the sample (used for naming the cells, see @details).
     #' Optional, if not provided, it is generated from the `data.dir` parameter.
+    #' @param use.micron boolean. Use coordinates in um instead of pixel. Optional.
     #' 
     #' @usage It assumes the input files in `data.dir` have been created with:
     #' ResolveTools pipeline: https://codebase.helmholtz.cloud/resolve_tools/resolve-processing
@@ -120,12 +176,12 @@ ReadResolve <- function(data.dir, sample.name = NULL){
     }
     
     outs <- FormatResolve(metadata$sample_name, metadata$mask, metadata$cell_data,
-        metadata$filtered_transcripts, metadata$gapfilled, metadata$roi)
+        metadata$filtered_transcripts, metadata$gapfilled, metadata$roi, use.micron)
     return(outs)
 }
 
 
-LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL){
+LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL, use.micron = TRUE){
     #' Read Resolve Data from a given folder and create a SeuratObject.
     #' 
     #' @description This function reads the provided file names from a given folder
@@ -134,6 +190,7 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL){
     #' @param data.dir character. Path to the directory containing the data to be loaded.
     #' @param sample.name character. Name of the sample (used for naming the cells, see @details).
     #' Optional, if not provided, it is generated from the `data.dir` parameter.
+    #' @param use.micron boolean. Use coordinates in um instead of pixel. Optional.
     #' 
     #' @usage It assumes the input files in `data.dir` have been created with:
     #' ResolveTools pipeline: https://codebase.helmholtz.cloud/resolve_tools/resolve-processing
@@ -149,7 +206,7 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL){
     #' @details The cells are named with the "$sample.name-cell-$N" pattern.
     #'
     
-    data <- ReadResolve(data.dir, sample.name)
+    data <- ReadResolve(data.dir, sample.name, use.micron)
     
     resolve.obj <- CreateSeuratObject(counts = data[["expression"]], assay = assay)
 
