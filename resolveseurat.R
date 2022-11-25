@@ -1,9 +1,11 @@
 rm(list = ls())
-library(Seurat)
 library(future)
 plan("multisession", workers = 10)
 library(data.table)
+library(Seurat)
+library(tiff)
 library(RImageJROI)
+library(docstring) # Just for the docstrings
 
 # Source the Load functions
 source("load_function.R")
@@ -11,10 +13,8 @@ source("load_function.R")
 # https://satijalab.org/seurat/articles/spatial_vignette_2.html#human-lymph-node-akoya-codex-system
 
 ### Path to files to read:
-# PANORAMA_PATH: Path to the folder with the Panoramas from resolve
 # OUTPUT_PATH: Path to the output of the Resolve Processing pipeline
 
-PANORAMA_PATH <- ""
 OUTPUT_PATH <- ""
 
 
@@ -23,55 +23,58 @@ resolve.objs <- LoadResolveFromFolders("/home/bq_mbortolomeazzi/NEUROBLASTOMA/ou
 
 
 # SAMPLE NAME TO TEST
+# "_" not accepted
 SAMPLE_NAME <- ""
 
 resolve.obj <-resolve.objs[[SAMPLE_NAME]]
-
+resolve.obj <- LoadResolve(OUTPUT_PATH, sample.name = SAMPLE_NAME)
 
 #### Quick test single cell analysis, not meaningful just to have something to plot
-resolve.obj <- subset(resolve.obj, subset = nCount_Spatial > 10) # Skip cells with no transcripts 
+resolve.obj <- subset(resolve.obj, subset = nCount_Resolve > 10) # Skip cells with no transcripts 
 resolve.obj <- SCTransform(resolve.obj, assay = "Resolve", verbose = FALSE)
 resolve.obj <- FindVariableFeatures(resolve.obj, assay = "Resolve")
 resolve.obj <- RunPCA(object = resolve.obj, npcs = 20, verbose = FALSE)
 resolve.obj <- RunUMAP(object = resolve.obj, dims = 1:20, verbose = FALSE)
 resolve.obj <- FindNeighbors(object = resolve.obj, dims = 1:20, verbose = FALSE)
 resolve.obj <- FindClusters(object = resolve.obj, verbose = FALSE,
-  resolution = 0.1)
+  resolution = 0.9)
 
 resolve.obj@active.assay <- "Resolve" # To show the real counts in the plots
 
 
-
-
 ### Plotting
-# FEATURES_TO_PLOT: vector of gene names
-FEATURES_TO_PLOT <- ""
-
+my_features = c("Wnt7b", "Snap25", "Bcl6", "Sox10")
+my_gene = "Sox10"
 # No spatial data
 nos_dp <- DimPlot(resolve.obj, label = TRUE, label.box = TRUE) + NoLegend() 
-nos_fp <- FeaturePlot(resolve.obj, features = FEATURES_TO_PLOT, min.cutoff = "q10", max.cutoff = "q90") 
+nos_fp <- FeaturePlot(resolve.obj, features = my_features, min.cutoff = "q10", max.cutoff = "q90") 
 
 # Plus spatial data (cells as circles on their centroids)
-cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "centroids")
-cen_fp <- ImageFeaturePlot(resolve.obj, fov = "centroids", features = FEATURES_TO_PLOT)
+cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "MYSAMPLE", boundaries = "centroids")
+cen_fp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", features = my_features, boundaries = "centroids")
 
 # Plus spatial data (cells as segmentation outlines)
-seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "segmentation")
-seg_fp <- ImageFeaturePlot(resolve.obj, features = FEATURES_TO_PLOT,
-    min.cutoff = "q10", max.cutoff = "q90", fov = "segmentation")
+seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "MYSAMPLE", boundaries = "segmentation")
+seg_fp <- ImageFeaturePlot(resolve.obj, features = my_features,
+    min.cutoff = "q11", max.cutoff = "q90", fov = "MYSAMPLE", boundaries = "segmentation")
 
 # Raw transcript visualization
 # - size = 0 avoids displaying the cells
-# - nmols = 9999999999 displays all the transcripts, instead of a sample 
-cen_mp <- ImageFeaturePlot(resolve.obj, fov = "centroids", features = FEATURES_TO_PLOT[1],
-  size = 0, molecules = FEATURES_TO_PLOT, mols.cols = c("#FF0000",
-  "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
+# - nmols = max number of molecules to display
 
-seg_mp <- ImageFeaturePlot(resolve.obj, fov = "segmentation", features = FEATURES_TO_PLOT[1], 
-  molecules = FEATURES_TO_PLOT, mols.cols = c("#0000FF"), nmols = 9999999999,
+# Still not nice, but molecules need to be in this form:
+# "Resolve_Wnt7" also they are plotted in the legend as "mols_Wnt7"
+# See Seurat:::.MolsByFOV and SeuratObject:::FetchData.Molecules
+my_molecules <- paste0(Key(resolve.obj)["MYSAMPLE"], my_features)
+names(my_molecules) <- rep_len(x = "MYSAMPLE", length.out = length(my_molecules))
+
+cen_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "centroids",
+    features = my_gene, size = 0, molecules = my_molecules, mols.cols = c("#FF0000",
+ "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
+
+seg_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "segmentation",
+    features = my_gene, molecules = my_molecules[[4]], mols.cols = c("#0000FF"), nmols = 9999999999,
   min.cutoff = "q10", max.cutoff = "q90")
-
-
 
 
 ####################

@@ -1,13 +1,3 @@
-rm(list = ls())
-library(future)
-plan("multisession", workers = 10)
-library(data.table)
-library(Seurat)
-library(tiff)
-.libPaths("~/R/x86_64-pc-linux-gnu-library/4.2.1")
-library(RImageJROI)
-library(docstring)
-
 ConvertCoordinatesResolve <- function(resolve.data, x.res = 0.138, y.res = 0.138){
     #' Convert the coordinates of Resolve data from pixel to micron.
     #' 
@@ -23,11 +13,11 @@ ConvertCoordinatesResolve <- function(resolve.data, x.res = 0.138, y.res = 0.138
     #'
     #' @return A named list with the following objects:
     #' \itemize{
-    #' \item expression: Expression matrix rows -> gene, columns -> cells. Optional.
+    #' \item transcripts: Expression matrix rows -> gene, columns -> cells. Optional.
     #' \item coordinates: Dataframe with the coordinates of the cell centroids. Optional
-    #' \item transcripts: Dataframe with the coordinates of the transcripts. Optional
+    #' \item molecules: Dataframe with the coordinates of the molecules. Optional
     #' \item image: Additional image. Optional
-    #' \item rois: Dataframe with the coordinates of the segmentation ROIs. Optional.
+    #' \item segmentation: Dataframe with the coordinates of the segmentation ROIs. Optional.
     #' }
     #'
     #' @details The cells are named with the "$SAMPLE-cell-$N" pattern,
@@ -35,14 +25,14 @@ ConvertCoordinatesResolve <- function(resolve.data, x.res = 0.138, y.res = 0.138
     #'
     resolve.data[["coordinates"]]$x <- resolve.data[["coordinates"]]$x * x.res
     resolve.data[["coordinates"]]$y <- resolve.data[["coordinates"]]$y * y.res
-    if (!is.null(resolve.data[["rois"]])){
-        resolve.data[["rois"]]$x <- resolve.data[["rois"]]$x * x.res
-        resolve.data[["rois"]]$y <- resolve.data[["rois"]]$y * y.res
+    if (!is.null(resolve.data[["segmentation"]])){
+        resolve.data[["segmentation"]]$x <- resolve.data[["segmentation"]]$x * x.res
+        resolve.data[["segmentation"]]$y <- resolve.data[["segmentation"]]$y * y.res
     }
     
-    if (!is.null(resolve.data[["transcripts"]])){
-        resolve.data[["transcripts"]]$x <- resolve.data[["transcripts"]]$x * x.res
-        resolve.data[["transcripts"]]$y <- resolve.data[["transcripts"]]$y * y.res
+    if (!is.null(resolve.data[["molecules"]])){
+        resolve.data[["molecules"]]$x <- resolve.data[["molecules"]]$x * x.res
+        resolve.data[["molecules"]]$y <- resolve.data[["molecules"]]$y * y.res
     }
     return(resolve.data)
 }
@@ -68,11 +58,11 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
     #'
     #' @return A named list with the following objects:
     #' \itemize{
-    #' \item expression: Expression matrix rows -> gene, columns -> cells.
+    #' \item transcripts: Expression matrix rows -> gene, columns -> cells.
     #' \item coordinates: Dataframe with the coordinates of the cell centroids.
-    #' \item transcripts: Dataframe with the coordinates of the transcripts. Optional
+    #' \item molecules: Dataframe with the coordinates of the molecules. Optional
     #' \item image: Additional image. Optional
-    #' \item rois: Dataframe with the coordinates of the segmentation ROIs. Optional
+    #' \item segmentation: Dataframe with the coordinates of the segmentation ROIs. Optional
     #' }
     #'
     #' @details The cells are named with the "$SAMPLE-cell-$N" pattern,
@@ -103,14 +93,14 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
     row.names(measurements) <- markers
     colnames(measurements) <- cells$cell_id
     
-    outs[["expression"]] <- measurements
+    outs[["transcripts"]] <- measurements
     outs[["coordinates"]] <- fov_coordinates
     
     if (!is.null(transcript.file)){
-        transcripts <- fread(transcript.file)
-        transcripts <- transcripts[, .(x = height - V2, y = V1, gene = V4)]
-        transcripts <- as.data.frame(transcripts)
-        outs[["transcripts"]] <- transcripts
+        molecules <- fread(transcript.file)
+        molecules <- molecules[, .(x = height - V2, y = V1, gene = V4)]
+        molecules <- as.data.frame(molecules)
+        outs[["molecules"]] <- molecules
     }
 
     if (!is.null(image.file)){
@@ -130,7 +120,7 @@ FormatResolve <- function(sample.name, mask.file, cells.file, transcript.file = 
         cell_roi[, x := height - y2]
         cell_roi[, y2 := NULL]
         cell_roi <- as.data.frame(cell_roi)
-        outs[["rois"]] <- cell_roi
+        outs[["segmentation"]] <- cell_roi
     }
     if (use.micron){
         outs <- ConvertCoordinatesResolve(outs)
@@ -154,11 +144,11 @@ ReadResolve <- function(data.dir, sample.name = NULL, use.micron = TRUE){
     #'
     #' @return A named list with the following objects:
     #' \itemize{
-    #' \item expression: Expression matrix rows -> genes, columns -> cells.
+    #' \item transcripts: Expression matrix rows -> genes, columns -> cells.
     #' \item coordinates: Dataframe with the coordinates of the cell centroids.
-    #' \item transcripts: Dataframe with the coordinates of the transcripts.
+    #' \item molecules: Dataframe with the coordinates of the molecules.
     #' \item image: Additional image
-    #' \item rois: Dataframe with the coordinates of the segmentation ROIs.
+    #' \item segmentation: Dataframe with the coordinates of the segmentation ROIs.
     #' }
     #'
     #' @details The cells are named with the "$SAMPLE-cell-$N" pattern,
@@ -177,6 +167,7 @@ ReadResolve <- function(data.dir, sample.name = NULL, use.micron = TRUE){
     
     outs <- FormatResolve(metadata$sample_name, metadata$mask, metadata$cell_data,
         metadata$filtered_transcripts, metadata$gapfilled, metadata$roi, use.micron)
+    outs[["sample.name"]] <- metadata$sample_name
     return(outs)
 }
 
@@ -203,12 +194,15 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL, use.mic
     #' \item  meta.data
     #' }
     #'
-    #' @details The cells are named with the "$sample.name-cell-$N" pattern.
+    #' @details All "_" are removed from sample.name.
+    #' The cells are named with the "$sample.name-cell-$N" pattern.
     #'
     
     data <- ReadResolve(data.dir, sample.name, use.micron)
+    sample.name <- data[["sample.name"]]
+    sample.name <- gsub("_", "", sample.name)
     
-    resolve.obj <- CreateSeuratObject(counts = data[["expression"]], assay = assay)
+    resolve.obj <- CreateSeuratObject(counts = data$transcripts, assay = assay)
 
     resolve.obj@meta.data["cell_id"] <- rownames(resolve.obj@meta.data)
     resolve.obj@meta.data["sample_name"] <- sample.name
@@ -222,28 +216,15 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL, use.mic
     rownames(resolve.obj@meta.data) <- resolve.obj@meta.data$cell_id 
     
     resolve.obj@images <- list()
-    resolve.obj@images["centroids"] <- CreateFOV(
-        coords = data[["coordinates"]],
-        type = "centroids",
-        nsides = 0L,
-        radius = 1L,
-        theta = 0L,
-        molecules = data[["transcripts"]],
-        assay = assay,
-        key = NULL,
-        name = NULL)
-        
-    if(!is.null(data[["rois"]])){
-        resolve.obj@images["segmentation"] <- CreateFOV(
-            coords = data[["rois"]],
-            type = "segmentation",
-            nsides = 0L,
-            radius = 1L,
-            theta = 0L,
-            molecules = data[["transcripts"]], 
-            assay = assay,
-            key = NULL,
-            name = NULL)
-    }   
+    fov_data <- list(segmentation = CreateSegmentation(data$segmentation))
+    if(!is.null(data[["segmentation"]])){
+          fov_data[["centroids"]] <- CreateCentroids(data$coordinates)
+    }
+    resolve.obj@images[[sample.name]] <- CreateFOV(
+        coords = fov_data,
+        type = c("segmentation", "centroids"),
+        molecules = data[["molecules"]],
+        assay = assay)
     return(resolve.obj)
 }
+
