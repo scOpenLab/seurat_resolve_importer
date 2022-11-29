@@ -62,18 +62,12 @@ seg_fp <- ImageFeaturePlot(resolve.obj, features = my_features,
 # - size = 0 avoids displaying the cells
 # - nmols = max number of molecules to display
 
-# Still not nice, but molecules need to be in this form:
-# "Resolve_Wnt7" also they are plotted in the legend as "mols_Wnt7"
-# See Seurat:::.MolsByFOV and SeuratObject:::FetchData.Molecules
-my_molecules <- paste0(Key(resolve.obj)["MYSAMPLE"], my_features)
-names(my_molecules) <- rep_len(x = "MYSAMPLE", length.out = length(my_molecules))
-
 cen_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "centroids",
-    features = my_gene, size = 0, molecules = my_molecules, mols.cols = c("#FF0000",
+    features = my_gene, size = 0, molecules = my_features, mols.cols = c("#FF0000",
  "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
 
 seg_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "segmentation",
-    features = my_gene, molecules = my_molecules[[4]], mols.cols = c("#0000FF"), nmols = 9999999999,
+    features = my_gene, molecules = my_features[[4]], mols.cols = c("#0000FF"), nmols = 9999999999,
   min.cutoff = "q10", max.cutoff = "q90")
 
 
