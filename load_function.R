@@ -194,13 +194,12 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL, use.mic
     #' \item  meta.data
     #' }
     #'
-    #' @details All "_" are removed from sample.name.
+    #' @details
     #' The cells are named with the "$sample.name-cell-$N" pattern.
     #'
     
     data <- ReadResolve(data.dir, sample.name, use.micron)
     sample.name <- data[["sample.name"]]
-    sample.name <- gsub("_", "", sample.name)
     
     resolve.obj <- CreateSeuratObject(counts = data$transcripts, assay = assay)
 
@@ -220,11 +219,14 @@ LoadResolve <- function(data.dir, assay = "Resolve", sample.name = NULL, use.mic
     if(!is.null(data[["segmentation"]])){
           fov_data[["centroids"]] <- CreateCentroids(data$coordinates)
     }
-    resolve.obj@images[[sample.name]] <- CreateFOV(
+    coords <- CreateFOV(
         coords = fov_data,
         type = c("segmentation", "centroids"),
         molecules = data[["molecules"]],
         assay = assay)
+    coords <- subset(x = coords, 
+        cells = intersect(x = Cells(x = coords[["segmentation"]]),
+            y = Cells(x = resolve.obj)))  
+    resolve.obj@images[[sample.name]] <- coords
     return(resolve.obj)
 }
-
