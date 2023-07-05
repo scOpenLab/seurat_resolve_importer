@@ -17,19 +17,13 @@ source("load_function.R")
 
 OUTPUT_PATH <- ""
 
-
-resolve.objs <- LoadResolveFromFolders("/home/bq_mbortolomeazzi/NEUROBLASTOMA/output_mindagap",
-    "/home/bq_mbortolomeazzi/NEUROBLASTOMA/panoramas_DAPI")
-
-
 # SAMPLE NAME TO TEST
 # "_" not accepted
 SAMPLE_NAME <- ""
 
-resolve.obj <-resolve.objs[[SAMPLE_NAME]]
 resolve.obj <- LoadResolve(OUTPUT_PATH, sample.name = SAMPLE_NAME)
 
-#### Quick test single cell analysis, not meaningful just to have something to plot
+#### Just as a quick test. See the Seurat docs for how to perform the analysis 
 resolve.obj <- subset(resolve.obj, subset = nCount_Resolve > 10) # Skip cells with no transcripts 
 resolve.obj <- SCTransform(resolve.obj, assay = "Resolve", verbose = FALSE)
 resolve.obj <- FindVariableFeatures(resolve.obj, assay = "Resolve")
@@ -43,32 +37,32 @@ resolve.obj@active.assay <- "Resolve" # To show the real counts in the plots
 
 
 ### Plotting
-my_features = c("Wnt7b", "Snap25", "Bcl6", "Sox10")
-my_gene = "Sox10"
+my_features = c("GENE2", "GENE3", "GENE4", "GENE5")
+my_gene = "GENE1"
 # No spatial data
 nos_dp <- DimPlot(resolve.obj, label = TRUE, label.box = TRUE) + NoLegend() 
 nos_fp <- FeaturePlot(resolve.obj, features = my_features, min.cutoff = "q10", max.cutoff = "q90") 
 
 # Plus spatial data (cells as circles on their centroids)
-cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "MYSAMPLE", boundaries = "centroids")
-cen_fp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", features = my_features, boundaries = "centroids")
+cen_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = SAMPLE_NAME, boundaries = "centroids", border.color = NA)
+cen_fp <- ImageFeaturePlot(resolve.obj, fov = SAMPLE_NAME, features = my_features, boundaries = "centroids", border.color = NA)
 
 # Plus spatial data (cells as segmentation outlines)
-seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = "MYSAMPLE", boundaries = "segmentation")
+seg_dp <- ImageDimPlot(resolve.obj, cols = "parade", fov = SAMPLE_NAME, boundaries = "segmentation", border.color = NA)
 seg_fp <- ImageFeaturePlot(resolve.obj, features = my_features,
-    min.cutoff = "q11", max.cutoff = "q90", fov = "MYSAMPLE", boundaries = "segmentation")
+    min.cutoff = "q11", max.cutoff = "q90", fov = SAMPLE_NAME, boundaries = "segmentation", border.color = NA)
 
 # Raw transcript visualization
 # - size = 0 avoids displaying the cells
 # - nmols = max number of molecules to display
 
-cen_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "centroids",
+cen_mp <- ImageFeaturePlot(resolve.obj, fov = SAMPLE_NAME, boundaries = "centroids",
     features = my_gene, size = 0, molecules = my_features, mols.cols = c("#FF0000",
- "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999)
+ "#00FF00", "#0000FF", "#FFFF00"), nmols = 9999999999, border.color = NA)
 
-seg_mp <- ImageFeaturePlot(resolve.obj, fov = "MYSAMPLE", boundaries = "segmentation",
+seg_mp <- ImageFeaturePlot(resolve.obj, fov = SAMPLE_NAME, boundaries = "segmentation",
     features = my_gene, molecules = my_features[[4]], mols.cols = c("#0000FF"), nmols = 9999999999,
-  min.cutoff = "q10", max.cutoff = "q90")
+  min.cutoff = "q10", max.cutoff = "q90", border.color = NA)
 
 
 ####################
